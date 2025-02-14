@@ -14,8 +14,8 @@ ARGS="
 --seed 42
 --train_set_path DKYoon/slimorca-200k-english
 --output_exists True
---enc_name_or_path ../../../mST5-saved-2
---enc_lora_path ../../../trained_models/mST5-barlow-final-true-2
+--enc_name_or_path ../../mST5-saved-2
+--enc_lora_path ../../trained_models/mST5-barlow-final-true-2
 --lm_name_or_path microsoft/Orca-2-7b
 --alignments linear
 --enc_hidden_size 2048
