@@ -17,7 +17,10 @@ logging.getLogger("openai").setLevel(logging.WARNING)
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint_path", required=True)
+    parser.add_argument("--use_vllm", action="store_true",
+                    help="Use vLLM for faster inference")
     parser.add_argument("--enc_tokenizer", default='')
+    parser.add_argument("--dec_tokenizer", default='')
     parser.add_argument("--model_args", default="")
     parser.add_argument("--tasks", default=None,
                         choices=utils.MultiChoice(tasks.ALL_TASKS))
@@ -81,23 +84,50 @@ def main():
 
     try:
         lm_tokenizer = AutoTokenizer.from_pretrained(
-            args.checkpoint_path, use_fast=False)
+            args.dec_tokenizer, use_fast=False)
     except:
         lm_tokenizer = AutoTokenizer.from_pretrained(
-            args.checkpoint_path, use_fast=True)
+            args.dec_tokenizer, use_fast=True)
 
     if not enc_tokenizer.pad_token:
         enc_tokenizer.pad_token = enc_tokenizer.eos_token
     if not lm_tokenizer.pad_token:
         lm_tokenizer.pad_token = lm_tokenizer.eos_token
 
-    eval_model = LBSeq2SeqLM(
-        model=model,
-        enc_tokenizer=enc_tokenizer,
-        lm_tokenizer=lm_tokenizer,
-        batch_size=args.batch_size,
-        max_batch_size=args.max_batch_size,
-    )
+    if args.use_vllm:
+        import vllm
+        from vllm import LLM
+        from lm_eval.models.langbridge import LBvLLMSeq2SeqLM
+
+        print("Using vLLM for inference with checkpoint:", args.checkpoint_path)
+        engine = LLM(
+            model=args.checkpoint_path,
+            trust_remote_code=True,
+            tensor_parallel_size=1,  # adjust as necessary
+        )
+        # Load the HF model for computing loglikelihood, etc.
+        model = LangBridgeModel.from_pretrained(
+            args.checkpoint_path, torch_dtype=torch.bfloat16
+        )
+        model.to(args.device)
+        eval_model = LBvLLMSeq2SeqLM(
+            engine=engine,
+            model=model,
+            enc_tokenizer=enc_tokenizer,
+            lm_tokenizer=lm_tokenizer,
+            batch_size=args.batch_size,
+            max_batch_size=args.max_batch_size,
+            device=args.device,
+        )
+    else:
+        from lm_eval.models.langbridge import LBSeq2SeqLM
+        eval_model = LBSeq2SeqLM(
+            model=model,
+            enc_tokenizer=enc_tokenizer,
+            lm_tokenizer=lm_tokenizer,
+            batch_size=args.batch_size,
+            max_batch_size=args.max_batch_size,
+        )
 
     results = evaluator.simple_evaluate(
         model=eval_model,

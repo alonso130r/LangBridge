@@ -500,6 +500,215 @@ class LBSeq2SeqLM(HuggingFaceLB):
         )
         return generations
 
+class LBvLLMSeq2SeqLM(HuggingFaceLB):
+    """
+    A vLLM-based Seq2Seq LM wrapper that extends HuggingFaceLB.
+    This class uses a vLLM engine for generation but uses the underlying Hugging Face
+    model (stored in self.model) for methods that require access to logits (loglikelihood).
+    This way, full functionality is maintained.
+    """
+    def __init__(
+        self,
+        engine,  # vLLM engine instance (for fast generation)
+        model: LangBridgeModel,  # underlying HF model for scoring
+        enc_tokenizer: transformers.PreTrainedTokenizer,
+        lm_tokenizer: transformers.PreTrainedTokenizer,
+        batch_size: Union[int, str] = 1,
+        max_batch_size: int = 512,
+        device: Union[str, torch.device] = "cuda",
+        max_gen_toks: int = 1024,
+        max_length: Optional[int] = None,
+        add_special_tokens: bool = True,
+    ):
+        # Do not call HuggingFaceLB.__init__ since we construct our own attributes
+        self.engine = engine
+        self.model = model
+        self.enc_tokenizer = enc_tokenizer
+        self.lm_tokenizer = lm_tokenizer
+        self._batch_size = int(batch_size)
+        self.max_batch_size = max_batch_size
+        self._device = device
+        self._max_gen_toks = max_gen_toks
+        self._max_length = max_length or lm_tokenizer.model_max_length
+        self._add_special_tokens = add_special_tokens
+
+        # For compatibility, set up cache_hook using utils (or a dummy if not available)
+        self.cache_hook = utils.get_cache_hook() if hasattr(utils, "get_cache_hook") else None
+
+        # Set eos tokens
+        # (Assumes the underlying lm_tokenizer is correctly initialized.)
+    
+    @property
+    def eot_token(self) -> str:
+        return self.lm_tokenizer.eos_token
+
+    @property
+    def eot_token_id(self) -> int:
+        return self.lm_tokenizer.eos_token_id
+
+    @property
+    def max_gen_toks(self) -> int:
+        return self._max_gen_toks
+
+    @property
+    def max_length(self) -> int:
+        return self._max_length
+
+    @property
+    def batch_size(self) -> int:
+        return self._batch_size
+
+    @property
+    def device(self) -> Union[str, torch.device]:
+        return self._device
+
+    def tok_encode(self, string: str) -> TokenSequence:
+        return self.lm_tokenizer.encode(string, add_special_tokens=self._add_special_tokens)
+
+    def tok_encode_batch(self, strings: List[str]) -> TokenSequence:
+        return self.lm_tokenizer(
+            strings,
+            padding=True,
+            add_special_tokens=self._add_special_tokens,
+            return_tensors="pt",
+        )
+
+    def enc_tok_encode_batch(self, strings: List[str]) -> TokenSequence:
+        return self.enc_tokenizer(
+            strings,
+            padding=True,
+            add_special_tokens=self._add_special_tokens,
+            return_tensors="pt",
+        )
+
+    def tok_decode(self, tokens: Union[List[int], torch.Tensor]) -> List[str]:
+        if isinstance(tokens, torch.Tensor):
+            tokens = tokens.tolist()
+        if isinstance(tokens[0], list):
+            return [self.lm_tokenizer.decode(tok, skip_special_tokens=True) for tok in tokens]
+        return [self.lm_tokenizer.decode(tokens, skip_special_tokens=True)]
+
+    def _model_generate(
+        self,
+        inputs: BatchEncoding,
+        max_tokens: int,
+        stop: Optional[List[str]] = None,
+    ) -> TokenSequence:
+        """
+        Uses the vLLM engine to generate text. Converts the encoder input_ids into
+        text prompts, calls the engine for generation, then re-encodes the generated
+        text into token ids.
+        """
+        # Get encoder input_ids (assume these come from enc_tok_encode_batch)
+        enc_ids = inputs["input_ids"]
+        batch_size = enc_ids.size(0)
+        # Create textual prompts via decoding
+        prompts = [
+            self.enc_tokenizer.decode(enc_ids[i], skip_special_tokens=True)
+            for i in range(batch_size)
+        ]
+        # Always include eos token as stop signal
+        if stop is None:
+            until = [self.eot_token]
+        else:
+            until = stop + [self.eot_token]
+
+        generations = self.engine.generate(
+            prompts=prompts,
+            max_new_tokens=max_tokens,
+            do_sample=False,
+        )
+
+        results_tokens = []
+        for gen_text in generations:
+            for term in until:
+                if term in gen_text:
+                    gen_text = gen_text.split(term)[0]
+            tokens = self.lm_tokenizer.encode(gen_text, add_special_tokens=False)
+            results_tokens.append(tokens)
+        return results_tokens
+
+    def _model_call(
+        self, inputs: TokenSequence, labels: Optional[TokenSequence] = None
+    ) -> TokenSequence:
+        """
+        For loglikelihood, delegate to the underlying HF model.
+        """
+        return self.model(
+            enc_ids=inputs["input_ids"],
+            enc_mask=inputs["attention_mask"],
+            input_ids=labels["input_ids"],
+            attention_mask=labels["attention_mask"],
+            labels=labels["input_ids"],
+        )
+
+    def _loglikelihood_tokens(
+        self,
+        requests: List[Tuple[Tuple[str, str], TokenSequence, TokenSequence]],
+        disable_tqdm: Optional[bool] = False,
+    ) -> List[Tuple[float, bool]]:
+        results = []
+        for chunk in tqdm(
+            requests, total=math.ceil(len(requests)), disable=disable_tqdm
+        ):
+            cache_keys, inputs_tokens, targets_tokens = chunk
+            inputs_tokens = inputs_tokens.to(self.device)
+            targets_tokens = targets_tokens.to(self.device)
+            outputs = self._model_call(
+                inputs=inputs_tokens, labels=targets_tokens
+            )
+            log_softmaxes = F.log_softmax(outputs.logits, dim=-1)
+            # The inputs_tokens shape includes the encoder part.
+            _, enc_input_length = inputs_tokens["input_ids"].shape
+            output_iterator = zip(
+                zip(cache_keys[0], cache_keys[1]),
+                log_softmaxes,
+                targets_tokens["input_ids"],
+                targets_tokens["attention_mask"],
+            )
+            for cache_key, log_softmax, target_tokens, target_mask in output_iterator:
+                length = target_mask.sum()
+                start_idx = enc_input_length
+                end_idx = start_idx + length
+                log_softmax = log_softmax[start_idx:end_idx]
+                target_tokens = target_tokens[:length]
+                greedy_tokens = log_softmax.argmax(dim=-1)
+                max_equal = (greedy_tokens == target_tokens).all()
+                target_logits = torch.gather(
+                    log_softmax, 1, target_tokens.unsqueeze(-1)
+                ).squeeze(-1)
+                answer = (float(target_logits.sum()), bool(max_equal))
+                results.append(answer)
+                if cache_key is not None and self.cache_hook is not None:
+                    self.cache_hook.add_partial(
+                        "loglikelihood", cache_key, answer
+                    )
+        return results
+
+    def loglikelihood(
+        self, requests: List[Tuple[str, str]]
+    ) -> List[Tuple[float, bool]]:
+        """
+        Computes the loglikelihood for each (context, continuation) pair.
+        """
+        new_requests = []
+        for chunk in utils.chunks(requests, self.batch_size):
+            context, continuation = zip(*chunk)
+            # Fill empty contexts with the EOT token.
+            context = [
+                f"{self.eot_token}" if len(text) == 0 else text for text in context
+            ]
+            context_enc = self.enc_tok_encode_batch(list(context))
+            for key in context_enc:
+                context_enc[key] = context_enc[key][:, -self.max_length:]
+            continuation = [text.lstrip() for text in continuation]
+            continuation_enc = self.tok_encode_batch(list(continuation))
+            for key in continuation_enc:
+                continuation_enc[key] = continuation_enc[key][:, -self.max_length:]
+            new_requests.append(
+                ((list(context), list(continuation)), context_enc, continuation_enc)
+            )
+        return self._loglikelihood_tokens(new_requests)
 
 class MultiTokenEOSCriteria(transformers.StoppingCriteria):
     """Criteria to stop on the specified multi-token sequence."""
