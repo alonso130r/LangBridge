@@ -47,7 +47,7 @@ class LBBaseModel(ABC, PreTrainedModel):
         super().__init__(config)
         if 'umt5' in config.enc.lower():
             enc_class = UMT5EncoderModel
-        elif 'mt5' in config.enc.lower():
+        elif 'mt5' in config.enc.lower() or 'mst5' in config.enc.lower():
             enc_class = MT5EncoderModel
         else:
             enc_class = AutoModel
