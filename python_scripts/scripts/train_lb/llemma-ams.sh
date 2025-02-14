@@ -9,13 +9,14 @@ NUM_GPU=4
 ARGS="
 --n_gpu $NUM_GPU
 --strategy deepspeed_stage_2
---output_dir checkpoints/llama2-lb-9b
---run_name llama2-lb-9b
+--output_dir checkpoints/llemma-lb-9b
+--run_name llemma-lb-9b
 --seed 42
---train_set_path DKYoon/slimpajama-200k
+--train_set_path DKYoon/proofpile2-200k
 --output_exists False
---enc_name_or_path DKYoon/mt5-xl-lm-adapt
---lm_name_or_path meta-llama/Llama-2-7b-hf
+--enc_name_or_path ../mST5-saved-2
+--enc_lora_path ../trained_models/mST5-AMS-final-true
+--lm_name_or_path EleutherAI/llemma_7b
 --alignments linear
 --enc_hidden_size 2048
 --lm_hidden_size 4096

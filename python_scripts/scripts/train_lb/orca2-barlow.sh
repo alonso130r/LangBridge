@@ -9,13 +9,14 @@ NUM_GPU=4
 ARGS="
 --n_gpu $NUM_GPU
 --strategy deepspeed_stage_2
---output_dir checkpoints/metamath-lb-9b
---run_name metamath-lb-9b
+--output_dir checkpoints/orca2-lb-9b
+--run_name orca2-lb-9b
 --seed 42
---train_set_path DKYoon/metamath-200k
+--train_set_path DKYoon/slimorca-200k-english
 --output_exists True
---enc_name_or_path DKYoon/mt5-xl-lm-adapt
---lm_name_or_path meta-math/MetaMath-7B-V1.0
+--enc_name_or_path ../mST5-saved-2
+--enc_lora_path ../trained_models/mST5-barlow-final-true-2
+--lm_name_or_path microsoft/Orca-2-7b
 --alignments linear
 --enc_hidden_size 2048
 --lm_hidden_size 4096

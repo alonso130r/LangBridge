@@ -3,6 +3,7 @@ from dataclasses import asdict, dataclass, field
 import logging
 import string
 import random
+from typing import Optional
 
 
 import torch
@@ -208,6 +209,7 @@ class LBTrainingArguments:
     hf_checkpoint_path: str = field(default=None)
 
     enc_name_or_path: str = field(default='DKYoon/mt5-small-lm-adapt')
+    enc_lora_path: Optional[str] = field(default=None)
     lm_name_or_path: str = field(default='facebook/opt-125m')
     alignments: str = field(default='linear')
     add_new_lines_to_enc: bool = field(default=True)
@@ -326,6 +328,15 @@ if __name__ == '__main__':
             logger.warning('Evaluating an un-aligned model!')
 
         model = model_class(config, random_init=False)
+    
+    # Load LoRA adapter for the encoder if provided
+    if training_args.enc_lora_path is not None:
+        try:
+            from peft import PeftModel
+        except ImportError:
+            raise ImportError("Please install peft: pip install peft")
+        model.lb.enc = PeftModel.from_pretrained(model.lb.enc, training_args.enc_lora_path)
+        model.lb.enc = model.lb.enc.merge_and_unload()
 
     # this is true for all our experiments, explained in section D.1
     if training_args.add_new_lines_to_enc:
