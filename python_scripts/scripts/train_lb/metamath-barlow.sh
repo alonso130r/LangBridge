@@ -18,7 +18,7 @@ ARGS="
 --enc_lora_path ../../trained_models/mST5-barlow-final-true-2/final_model
 --lm_name_or_path meta-math/MetaMath-7B-V1.0
 --alignments linear
---enc_hidden_size 2048
+--enc_hidden_size 4096
 --lm_hidden_size 4096
 --max_length 128
 --max_length_enc 1024

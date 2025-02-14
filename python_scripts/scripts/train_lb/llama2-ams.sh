@@ -18,7 +18,7 @@ ARGS="
 --enc_lora_path ../../trained_models/mST5-AMS-final-true/final_model
 --lm_name_or_path meta-llama/Llama-2-7b-hf
 --alignments linear
---enc_hidden_size 2048
+--enc_hidden_size 4096
 --lm_hidden_size 4096
 --max_length 128
 --max_length_enc 1024
