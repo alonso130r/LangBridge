@@ -288,8 +288,11 @@ if __name__ == '__main__':
             'output_exists and freeze_encoder should be the same value, see section D.1')
 
     # this must be a FastTokenizer to use dynamic length
-    enc_tokenizer = AutoTokenizer.from_pretrained(
-        training_args.enc_name_or_path, use_fast=True)
+    try:
+        enc_tokenizer = AutoTokenizer.from_pretrained(training_args.enc_name_or_path, use_fast=True)
+    except Exception:
+        # Fallback to a known pretrained tokenizer if local model lacks tokenizer files
+        enc_tokenizer = AutoTokenizer.from_pretrained("google/mt5-xxl", use_fast=True)
     try:
         lm_tokenizer = AutoTokenizer.from_pretrained(
             training_args.lm_name_or_path, use_fast=False)
