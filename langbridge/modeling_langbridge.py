@@ -91,6 +91,7 @@ class LBBaseModel(ABC, PreTrainedModel):
             param.requires_grad = True
 
     # get soft prompts
+    # NOTE: IF WE USE SENTENCE EMBEDDINGS, THIS IS WHERE EDITS NEED TO BE MADE
     def get_encoder_features(self, enc_ids: torch.Tensor, enc_mask: torch.Tensor) -> torch.Tensor:
         if self.config.freeze_encoder:
             with torch.no_grad():
