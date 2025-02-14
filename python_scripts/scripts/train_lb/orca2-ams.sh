@@ -9,7 +9,7 @@ NUM_GPU=4
 ARGS="
 --n_gpu $NUM_GPU
 --strategy deepspeed_stage_2
---output_dir checkpoints/orca2-lb-9b
+--output_dir checkpoints/orca2-lb-9b-ams
 --run_name orca2-lb-9b
 --seed 42
 --train_set_path DKYoon/slimorca-200k-english

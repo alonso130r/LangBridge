@@ -3,7 +3,7 @@ export HF_DATASETS_CACHE=/mnt/sda/dongkeun/huggingface_datasets
 export CUDA_VISIBLE_DEVICES=1
 
 python eval_langbridge.py \
-  --checkpoint_path kaist-ai/orca2-langbridge-9b \
+  --checkpoint_path checkpoints/orca2-lb-9b-barlow \
   --enc_tokenizer kaist-ai/langbridge_encoder_tokenizer \
   --tasks copa_gen \
   --instruction_template orca \

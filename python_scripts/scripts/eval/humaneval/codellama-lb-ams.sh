@@ -4,7 +4,7 @@ export HF_DATASETS_CACHE=/mnt/sda/dongkeun/huggingface_datasets
 
 
 accelerate launch eval_code.py \
-  --model kaist-ai/codellama-langbridge-15b \
+  --model checkpoints/codellama-lb-9b-ams \
   --enc_tokenizer kaist-ai/langbridge_encoder_tokenizer \
   --trust_remote_code \
   --tasks humaneval#en,humaneval#en_anon,humaneval#sw,humaneval#sw_anon,humaneval#bn,humaneval#bn_anon,humaneval#mr,humaneval#mr_anon,humaneval#ne,humaneval#ne_anon,humaneval#pa,humaneval#pa_anon,humaneval#te,humaneval#te_anon,humaneval#ur,humaneval#ur_anon \

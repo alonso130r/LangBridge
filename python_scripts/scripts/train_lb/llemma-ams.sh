@@ -9,7 +9,7 @@ NUM_GPU=4
 ARGS="
 --n_gpu $NUM_GPU
 --strategy deepspeed_stage_2
---output_dir checkpoints/llemma-lb-9b
+--output_dir checkpoints/llemma-lb-9b-ams
 --run_name llemma-lb-9b
 --seed 42
 --train_set_path DKYoon/proofpile2-200k
