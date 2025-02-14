@@ -15,7 +15,7 @@ ARGS="
 --train_set_path DKYoon/slimpajama-200k
 --output_exists False
 --enc_name_or_path ../../mST5-saved-2
---enc_lora_path ../../trained_models/mST5-AMS-final-true
+--enc_lora_path ../../trained_models/mST5-AMS-final-true/final_model
 --lm_name_or_path meta-llama/Llama-2-7b-hf
 --alignments linear
 --enc_hidden_size 2048

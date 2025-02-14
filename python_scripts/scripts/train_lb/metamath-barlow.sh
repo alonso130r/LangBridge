@@ -15,7 +15,7 @@ ARGS="
 --train_set_path DKYoon/metamath-200k
 --output_exists True
 --enc_name_or_path ../../mST5-saved-2
---enc_lora_path ../../trained_models/mST5-barlow-final-true-2
+--enc_lora_path ../../trained_models/mST5-barlow-final-true-2/final_model
 --lm_name_or_path meta-math/MetaMath-7B-V1.0
 --alignments linear
 --enc_hidden_size 2048
