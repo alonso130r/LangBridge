@@ -516,7 +516,7 @@ class LBvLLMSeq2SeqLM(HuggingFaceLB):
         batch_size: Union[int, str] = 1,
         max_batch_size: int = 512,
         device: Union[str, torch.device] = "cuda",
-        max_gen_toks: int = 1024,
+        max_gen_toks: int = 300,
         max_length: Optional[int] = None,
         add_special_tokens: bool = True,
     ):
