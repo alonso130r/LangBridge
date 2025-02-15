@@ -494,7 +494,7 @@ class LBSeq2SeqLM(HuggingFaceLB):
             attention_mask=attention_mask,
             enc_ids=enc_ids,
             enc_mask=enc_mask,
-            max_new_tokens=max_tokens,
+            max_new_tokens=300, # Set a fixed max length for now
             stopping_criteria=stopping_criteria,
             do_sample=False,
         )
